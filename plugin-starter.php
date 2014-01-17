@@ -64,28 +64,48 @@ wp_enqueue_style ('starterstyles', $starterstyles );
 
 ////////////////////////////////////////////
 /*         CRON DEMO STARTS HERE           */
+/////////////////////////////////////////////
 
-// first we create a scheduled event (if it does not exist already)
-if( !wp_next_scheduled( 'mycronjob' ) ) {  
-   wp_schedule_event( time(), 'daily', 'mycronjob' );  
-}
-
-// this is unscheduled in our uninstall.php file 
-// to manually unschedule use this:
-/*
-if( false !== ( $time = wp_next_scheduled( 'mycronjob' ) ) ) {  
-   wp_unschedule_event( $time, 'mycronjob' );  
+// unschedule event upon plugin deactivation
+function cronstarter_deactivate() {	
+	// find out when the last event was scheduled
+	$timestamp = wp_next_scheduled ('mycronjob');
+	// unschedule previous event if any
+	wp_unschedule_event ($timestamp, 'mycronjob');
 } 
-*/
+register_deactivation_hook (__FILE__, 'cronstarter_deactivate');
+
+// create a scheduled event (if it does not exist already)
+function cronstarter_activation() {
+	if( !wp_next_scheduled( 'mycronjob' ) ) {  
+	   wp_schedule_event( time(), 'everyminute', 'mycronjob' );  
+	}
+}
+// and make sure it's called whenever WordPress loads
+add_action('wp', 'cronstarter_activation');
 
 // here's the function we'd like to call with our cron job
 function my_repeat_function() {
 	
-	// do here what needs to be done automatically once a day	
+	// do here what needs to be done automatically as per your schedule
+	// in this example we're sending an email
+	
+	// components for our email
+	$recepients = 'you@example.com';
+	$subject = 'Hello from the Cron Job';
+	$message = 'This is a test mail sent by WordPress automatically.';
+	
+	// let's send it 
+	$success = mail($recepients, $subject, $message);
+	if ($success) {
+		// echo 'Mail added to outbox';
+	} else {
+		// echo 'That did not work so well';
+	}
 }
 
-// and finally hook that function onto our scheduled event:
-add_action( 'mycronjob', 'my_repeat_function' );  
+// hook that function onto our scheduled event:
+add_action ('mycronjob', 'my_repeat_function'); 
 
 // CUSTOM INTERVALS
 // by default we only have hourly, twicedaily and daily as intervals 
@@ -100,7 +120,18 @@ function cron_add_weekly( $schedules ) {
     );
     return $schedules;
 }
-add_filter( 'cron_schedules', 'cron_add_weekly' );
+add_filter( 'cron_schedules', 'cron_add_minute' );
+
+// add another interval
+function cron_add_minute( $schedules ) {
+	// Adds once every minute to the existing schedules.
+    $schedules['everyminute'] = array(
+	    'interval' => 60,
+	    'display' => __( 'Once Every Minute' )
+    );
+    return $schedules;
+}
+add_filter( 'cron_schedules', 'cron_add_minute' );
 
 /*
 more info here:
